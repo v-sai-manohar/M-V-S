@@ -1,0 +1,954 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>QNX Edge Analytics — PS#34</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f2f5;color:#0f1419;min-height:100vh}
+:root{
+  --p:#1e9df1;--c1:#1e9df1;--c2:#00b87a;--c3:#f7b928;--c5:#e0245e;
+  --bg:#ffffff;--card:#f7f8f8;--border:#e1eaef;--muted:#536471;
+  --input:#f7f9fa;--track:#e5e5e6;--fm:'Courier New',monospace
+}
+.dark{
+  --bg:#15202b;--card:#192734;--border:#38444d;--muted:#8899a6;
+  --input:#22303c;--track:#38444d
+}
+body.dark{background:#0d1926;color:#e7e9ea}
+
+/* NAV */
+nav{position:sticky;top:0;z-index:100;background:var(--bg);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;padding:0 1.5rem;height:54px;
+  box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.logo{display:flex;align-items:center;gap:.5rem;font-weight:700;font-size:.95rem}
+.logo-icon{width:28px;height:28px;background:var(--p);border-radius:7px;
+  display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px}
+.badge{font-size:.6rem;font-weight:700;padding:2px 8px;border-radius:999px;
+  background:#dbeafe;color:var(--p);font-family:var(--fm)}
+.pill{font-size:.62rem;font-weight:700;padding:3px 9px;border-radius:999px;
+  font-family:var(--fm);border:1px solid;display:inline-flex;align-items:center;gap:5px}
+.pill.sim{background:rgba(247,185,40,.1);color:var(--c3);border-color:rgba(247,185,40,.4)}
+.pill.live{background:rgba(0,184,122,.1);color:var(--c2);border-color:rgba(0,184,122,.4)}
+.pill.err{background:rgba(224,36,94,.1);color:var(--c5);border-color:rgba(224,36,94,.4)}
+.dot{width:7px;height:7px;border-radius:50%;animation:pulse 1.5s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.nav-btns{display:flex;gap:.4rem}
+.ibtn{background:none;border:1px solid var(--border);border-radius:.5rem;width:32px;height:32px;
+  cursor:pointer;color:var(--muted);font-size:15px;display:flex;align-items:center;justify-content:center}
+.ibtn:hover{background:var(--input);color:var(--p)}
+
+/* LAYOUT */
+.main{max-width:1350px;margin:0 auto;padding:1.2rem 1.5rem;display:flex;flex-direction:column;gap:1rem}
+
+/* CONFIG */
+.cfg-panel{background:var(--bg);border:1px solid var(--border);border-radius:12px;
+  padding:.85rem 1.2rem;display:flex;align-items:center;gap:.75rem;flex-wrap:wrap}
+.cfg-label{font-size:.72rem;font-weight:600;color:var(--muted);font-family:var(--fm)}
+.cfg-input{background:var(--input);border:1px solid var(--border);border-radius:.5rem;
+  padding:.35rem .65rem;font-family:var(--fm);font-size:.76rem;color:inherit;outline:none;width:170px}
+.cfg-input:focus{border-color:var(--p);outline:2px solid rgba(30,157,241,.2)}
+.cfg-btn{border:none;border-radius:.5rem;padding:.35rem .9rem;font-family:var(--fm);
+  font-size:.72rem;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:4px;color:#fff}
+.cfg-btn.primary{background:var(--p)}
+.cfg-btn.secondary{background:var(--c3)}
+.cfg-hint{font-size:.65rem;color:var(--muted);font-family:var(--fm)}
+.cfg-err{font-size:.65rem;color:var(--c5);font-family:var(--fm)}
+
+/* PIPELINE */
+.pipeline{background:var(--bg);border:1px solid var(--border);border-radius:12px;
+  padding:.8rem 1.2rem;display:flex;align-items:center;justify-content:center;gap:.35rem;flex-wrap:wrap}
+.pnode{display:flex;flex-direction:column;align-items:center;gap:3px}
+.pnode-label{font-size:.53rem;font-weight:700;font-family:var(--fm);color:var(--muted);
+  text-transform:uppercase;letter-spacing:.05em}
+.pnode-box{padding:3px 9px;border-radius:5px;font-size:.6rem;font-family:var(--fm);font-weight:700;border:1.5px solid}
+.pnode-sub{font-size:.48rem;color:var(--muted);font-family:var(--fm)}
+.ps{background:#dbeafe;color:var(--p);border-color:var(--p)}
+.pa{background:rgba(30,157,241,.1);color:var(--c1);border-color:var(--c1)}
+.pt{background:rgba(0,184,122,.1);color:var(--c2);border-color:var(--c2)}
+.ph{background:rgba(247,185,40,.1);color:var(--c3);border-color:var(--c3)}
+.pd{background:rgba(30,157,241,.07);color:var(--p);border-color:var(--p)}
+.arrow{color:var(--muted);font-size:.9rem;display:flex;flex-direction:column;align-items:center;gap:1px;padding:0 2px}
+.arrow-lbl{font-size:.46rem;color:var(--muted);font-family:var(--fm)}
+.flow-dot{width:4px;height:4px;border-radius:50%;animation:fa .9s ease-in-out infinite}
+.flow-dot:nth-child(2){animation-delay:.2s}.flow-dot:nth-child(3){animation-delay:.4s}
+@keyframes fa{0%,100%{opacity:.2;transform:scale(.7)}50%{opacity:1;transform:scale(1.2)}}
+
+/* STAT CARDS */
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:.9rem}
+.grid2{display:grid;grid-template-columns:repeat(2,1fr);gap:.9rem}
+.grid31{display:grid;grid-template-columns:2fr 1fr;gap:.9rem}
+@media(max-width:1050px){.grid4{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:650px){.grid4,.grid2,.grid31{grid-template-columns:1fr}}
+.card{background:var(--bg);border:1px solid var(--border);border-radius:14px;padding:1.1rem;
+  display:flex;flex-direction:column;gap:.8rem;transition:box-shadow .2s}
+.card:hover{box-shadow:0 4px 16px rgba(30,157,241,.1)}
+.card.alert{border-color:var(--c5);box-shadow:0 0 0 3px rgba(224,36,94,.08)}
+.card-header{display:flex;align-items:center;justify-content:space-between}
+.card-title{display:flex;align-items:center;gap:.45rem}
+.card-icon{width:26px;height:26px;border-radius:.45rem;display:flex;align-items:center;justify-content:center;font-size:14px}
+.ic-blue{background:rgba(30,157,241,.1);color:var(--c1)}
+.ic-green{background:rgba(0,184,122,.1);color:var(--c2)}
+.ic-amber{background:rgba(247,185,40,.1);color:var(--c3)}
+.ic-red{background:rgba(224,36,94,.1);color:var(--c5)}
+.card-label{font-size:.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-family:var(--fm)}
+.status-badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:999px;
+  font-size:.6rem;font-weight:700;font-family:var(--fm);text-transform:uppercase;border:1px solid}
+.sb-ok{background:rgba(0,184,122,.1);color:var(--c2);border-color:rgba(0,184,122,.25)}
+.sb-warn{background:rgba(247,185,40,.1);color:var(--c3);border-color:rgba(247,185,40,.25)}
+.sb-err{background:rgba(224,36,94,.1);color:var(--c5);border-color:rgba(224,36,94,.25)}
+.big-val{font-size:2rem;font-weight:700;letter-spacing:-.04em;font-family:var(--fm);line-height:1}
+.big-unit{font-size:.8rem;color:var(--muted);margin-left:3px}
+.sub-label{font-size:.62rem;color:var(--muted);margin-top:3px}
+.mini-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:.38rem;margin-top:.5rem}
+.mini-cell{background:var(--input);border:1px solid var(--border);border-radius:.5rem;padding:.38rem .45rem}
+.mini-key{font-size:.52rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-family:var(--fm)}
+.mini-val{font-size:.8rem;font-weight:700;font-family:var(--fm);margin-top:2px}
+.progress-wrap{display:flex;flex-direction:column;gap:.28rem}
+.progress-labels{display:flex;justify-content:space-between;font-size:.62rem;color:var(--muted);font-family:var(--fm)}
+.progress-track{height:5px;background:var(--track);border-radius:99px;overflow:hidden}
+.progress-fill{height:100%;border-radius:99px;transition:width .4s ease}
+
+/* GAUGE SVG */
+.gauge-wrap{position:relative;display:flex;align-items:center;justify-content:center}
+.gauge-center{position:absolute;text-align:center}
+.gauge-num{font-size:.88rem;font-weight:700;font-family:var(--fm)}
+
+/* CHARTS */
+.chart-container{width:100%;overflow:hidden}
+canvas{display:block;width:100%!important;height:175px!important}
+
+/* ANALYTICS PANEL */
+.analytics-grid{display:grid;grid-template-columns:1fr 1fr;gap:.65rem}
+.analytics-sub{background:var(--input);border:1px solid var(--border);border-radius:.65rem;padding:.7rem}
+.analytics-sub-title{font-size:.58rem;font-weight:700;font-family:var(--fm);margin-bottom:.45rem;
+  text-transform:uppercase;letter-spacing:.06em}
+.analytics-row{display:flex;justify-content:space-between;align-items:center;
+  font-size:.66rem;padding:.17rem 0;border-bottom:1px solid var(--border)}
+.analytics-row:last-child{border-bottom:none}
+.analytics-key{color:var(--muted);font-family:var(--fm)}
+.analytics-val{font-family:var(--fm);font-weight:600}
+.analytics-empty{text-align:center;padding:1.5rem;color:var(--muted);font-family:var(--fm);font-size:.7rem}
+.badges-row{display:flex;gap:.3rem;flex-wrap:wrap}
+
+/* TX DONUT */
+.tx-donut{display:flex;justify-content:center}
+.tx-rows{display:flex;flex-direction:column;gap:.3rem}
+.tx-row{display:flex;justify-content:space-between;font-size:.66rem;
+  padding:.17rem 0;border-bottom:1px solid var(--border)}
+.tx-row:last-child{border-bottom:none}
+.tx-key{color:var(--muted);font-family:var(--fm)}
+.tx-val{font-family:var(--fm);font-weight:700}
+.conn-bar{display:flex;align-items:center;gap:.45rem;padding:.4rem .55rem;
+  background:var(--input);border-radius:.5rem;border:1px solid var(--border);
+  font-size:.6rem;font-family:var(--fm);font-weight:600;margin-top:.3rem}
+
+/* LOG */
+.log-box{background:var(--bg);border:1px solid var(--border);border-radius:14px;overflow:hidden}
+.log-header{padding:.8rem 1.1rem;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between}
+.log-body{max-height:210px;overflow-y:auto}
+.log-row{display:flex;align-items:flex-start;gap:.6rem;padding:.42rem 1.1rem;
+  border-bottom:1px solid var(--border);font-size:.64rem;font-family:var(--fm)}
+.log-row:last-child{border-bottom:none}
+.log-row:hover{background:var(--input)}
+.log-time{color:var(--muted);min-width:58px;white-space:nowrap}
+.log-src{font-weight:700;min-width:70px;white-space:nowrap}
+.log-level{font-size:.54rem;font-weight:700;padding:1px 5px;border-radius:3px;align-self:center;white-space:nowrap}
+.lv-info{background:#dbeafe;color:var(--p)}
+.lv-warn{background:rgba(247,185,40,.15);color:#b45309}
+.lv-alert{background:rgba(224,36,94,.15);color:var(--c5)}
+.log-msg{color:inherit;opacity:.85}
+.log-empty{padding:1rem;text-align:center;color:var(--muted);font-size:.66rem;font-family:var(--fm)}
+.clr-btn{font-size:.6rem;font-family:var(--fm);background:none;border:1px solid var(--border);
+  border-radius:.38rem;padding:2px 7px;cursor:pointer;color:var(--muted)}
+.footer{text-align:center;padding:.55rem;font-size:.6rem;color:var(--muted);
+  font-family:var(--fm);border-top:1px solid var(--border)}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="logo">
+    <div class="logo-icon">&#9729;</div>
+    <span>EdgeAnalytics</span>
+    <span class="badge">QNX &middot; PS#34</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px">
+    <div class="dot" id="status-dot" style="background:var(--c3)"></div>
+    <span class="pill sim" id="mode-pill">SIMULATION</span>
+    <span style="font-size:.6rem;font-family:var(--fm);color:var(--muted)">seq#<span id="seq-num">0</span></span>
+  </div>
+  <div class="nav-btns">
+    <button class="ibtn" id="pause-btn" title="Pause/Resume">&#9646;&#9646;</button>
+    <button class="ibtn" id="cfg-btn" title="Settings">&#9881;</button>
+    <button class="ibtn" id="dark-btn" title="Dark mode">&#9790;</button>
+  </div>
+</nav>
+
+<div class="main">
+
+  <!-- CONFIG -->
+  <div class="cfg-panel" id="cfg-panel">
+    <span class="cfg-label">Pi IP Address:</span>
+    <input class="cfg-input" id="inp-ip" value="192.168.1.100" placeholder="192.168.1.100"/>
+    <span style="font-family:var(--fm);color:var(--muted)">:</span>
+    <input class="cfg-input" id="inp-port" value="8080" placeholder="8080" style="width:72px"/>
+    <button class="cfg-btn primary" id="connect-btn">&#128279; Connect to Pi</button>
+    <button class="cfg-btn secondary" id="sim-btn">&#8635; Simulation</button>
+    <span class="cfg-err" id="cfg-err" style="display:none"></span>
+    <span class="cfg-hint" id="cfg-hint">&#9889; Simulation mode — no Pi needed</span>
+  </div>
+
+  <!-- PIPELINE -->
+  <div class="pipeline">
+    <div class="pnode">
+      <div class="pnode-label">DHT22</div>
+      <div class="pnode-box ps">Sensor @P22</div>
+      <div class="pnode-sub">2s/sample</div>
+    </div>
+    <div class="arrow">
+      <div style="display:flex;gap:2px">
+        <div class="flow-dot" style="background:var(--c1)"></div>
+        <div class="flow-dot" style="background:var(--c1)"></div>
+        <div class="flow-dot" style="background:var(--c1)"></div>
+      </div>
+    </div>
+    <div class="pnode">
+      <div class="pnode-label">MPU6050</div>
+      <div class="pnode-box ps">Sensor @P22</div>
+      <div class="pnode-sub">100ms/sample</div>
+    </div>
+    <div class="arrow">&#8594;</div>
+    <div class="pnode">
+      <div class="pnode-label">Buffer</div>
+      <div id="buf-bars" style="display:flex;gap:2px"></div>
+      <div class="pnode-sub">lock-free SPSC</div>
+    </div>
+    <div class="arrow">&#8594;</div>
+    <div class="pnode">
+      <div class="pnode-label">Analytics</div>
+      <div class="pnode-box pa">Task @P20</div>
+      <div class="pnode-sub">2s window</div>
+    </div>
+    <div class="arrow">
+      <div class="arrow-lbl">MsgSend</div>
+      &#8594;
+      <div class="arrow-lbl">QNX IPC</div>
+    </div>
+    <div class="pnode">
+      <div class="pnode-label">Transmission</div>
+      <div class="pnode-box pt">Task @P15</div>
+      <div class="pnode-sub">MsgReceive</div>
+    </div>
+    <div class="arrow">
+      <div class="arrow-lbl">HTTP</div>
+      &#8594;
+    </div>
+    <div class="pnode">
+      <div class="pnode-label">Server</div>
+      <div class="pnode-box ph">:8080 @P10</div>
+      <div class="pnode-sub">TCP socket</div>
+    </div>
+    <div class="arrow">
+      <div class="arrow-lbl">fetch/500ms</div>
+      &#8594;
+    </div>
+    <div class="pnode">
+      <div class="pnode-label">Dashboard</div>
+      <div class="pnode-box pd">Browser</div>
+      <div class="pnode-sub">this page</div>
+    </div>
+  </div>
+
+  <!-- STAT CARDS -->
+  <div class="grid4">
+    <div class="card" id="card-temp">
+      <div class="card-header">
+        <div class="card-title">
+          <div class="card-icon ic-amber">&#127777;</div>
+          <span class="card-label">Temperature</span>
+        </div>
+        <span class="status-badge sb-ok" id="badge-temp">NORMAL</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:.85rem">
+        <div class="gauge-wrap" style="width:86px;height:86px">
+          <svg width="86" height="86" viewBox="0 0 86 86">
+            <circle cx="43" cy="43" r="36" fill="none" stroke="var(--track)" stroke-width="6"
+              stroke-dasharray="169.6 226.2" stroke-dashoffset="-28.3" stroke-linecap="round"/>
+            <circle id="gauge-temp" cx="43" cy="43" r="36" fill="none" stroke="var(--c3)" stroke-width="6"
+              stroke-dasharray="0 226.2" stroke-dashoffset="-28.3" stroke-linecap="round"
+              style="transition:stroke-dasharray .5s ease"/>
+          </svg>
+          <div class="gauge-center"><div class="gauge-num" id="gauge-temp-val">28</div></div>
+        </div>
+        <div style="flex:1">
+          <div><span class="big-val" id="temp-val">28</span><span class="big-unit">°C</span></div>
+          <div class="sub-label">DHT22 Sensor</div>
+          <div class="mini-grid">
+            <div class="mini-cell"><div class="mini-key">Min</div><div class="mini-val" id="temp-min">—</div></div>
+            <div class="mini-cell"><div class="mini-key">Avg</div><div class="mini-val" id="temp-avg">—</div></div>
+            <div class="mini-cell"><div class="mini-key">Max</div><div class="mini-val" id="temp-max">—</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" id="card-hum">
+      <div class="card-header">
+        <div class="card-title">
+          <div class="card-icon ic-blue">&#128167;</div>
+          <span class="card-label">Humidity</span>
+        </div>
+        <span class="status-badge sb-ok" id="badge-hum">NORMAL</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:.85rem">
+        <div class="gauge-wrap" style="width:86px;height:86px">
+          <svg width="86" height="86" viewBox="0 0 86 86">
+            <circle cx="43" cy="43" r="36" fill="none" stroke="var(--track)" stroke-width="6"
+              stroke-dasharray="169.6 226.2" stroke-dashoffset="-28.3" stroke-linecap="round"/>
+            <circle id="gauge-hum" cx="43" cy="43" r="36" fill="none" stroke="var(--c1)" stroke-width="6"
+              stroke-dasharray="0 226.2" stroke-dashoffset="-28.3" stroke-linecap="round"
+              style="transition:stroke-dasharray .5s ease"/>
+          </svg>
+          <div class="gauge-center"><div class="gauge-num" id="gauge-hum-val">60</div></div>
+        </div>
+        <div style="flex:1">
+          <div><span class="big-val" id="hum-val">60</span><span class="big-unit">%</span></div>
+          <div class="sub-label">DHT22 Sensor</div>
+          <div class="mini-grid">
+            <div class="mini-cell"><div class="mini-key">Min</div><div class="mini-val" id="hum-min">—</div></div>
+            <div class="mini-cell"><div class="mini-key">Avg</div><div class="mini-val" id="hum-avg">—</div></div>
+            <div class="mini-cell"><div class="mini-key">Max</div><div class="mini-val" id="hum-max">—</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" id="card-acc">
+      <div class="card-header">
+        <div class="card-title">
+          <div class="card-icon ic-red">&#11835;</div>
+          <span class="card-label">Accelerometer</span>
+        </div>
+        <span class="status-badge sb-ok" id="badge-acc">STABLE</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:.4rem">
+        <div><span class="big-val" id="acc-val">1.000</span><span class="big-unit">g</span></div>
+        <div class="sub-label">MPU6050 · |accel|</div>
+        <div class="progress-wrap">
+          <div class="progress-labels"><span>|a|</span><span id="acc-pct-lbl">1.000 g</span></div>
+          <div class="progress-track"><div class="progress-fill" id="acc-bar" style="width:20%;background:var(--c1)"></div></div>
+        </div>
+        <div class="mini-grid">
+          <div class="mini-cell"><div class="mini-key">Avg</div><div class="mini-val" id="acc-avg">—</div></div>
+          <div class="mini-cell"><div class="mini-key">Peak</div><div class="mini-val" id="acc-peak">—</div></div>
+          <div class="mini-cell"><div class="mini-key">Die°C</div><div class="mini-val" id="die-temp">—</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" id="card-gyr">
+      <div class="card-header">
+        <div class="card-title">
+          <div class="card-icon ic-green">&#9889;</div>
+          <span class="card-label">Gyroscope</span>
+        </div>
+        <span class="status-badge sb-ok" id="badge-gyr">STABLE</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:.4rem">
+        <div><span class="big-val" id="gyr-val">0.00</span><span class="big-unit">°/s</span></div>
+        <div class="sub-label">MPU6050 · |gyro|</div>
+        <div class="progress-wrap">
+          <div class="progress-labels"><span>|ω|</span><span id="gyr-pct-lbl">0.00 °/s</span></div>
+          <div class="progress-track"><div class="progress-fill" id="gyr-bar" style="width:0%;background:var(--c2)"></div></div>
+        </div>
+        <div class="mini-grid">
+          <div class="mini-cell"><div class="mini-key">Avg</div><div class="mini-val" id="gyr-avg">—</div></div>
+          <div class="mini-cell"><div class="mini-key">Peak</div><div class="mini-val" id="gyr-peak">—</div></div>
+          <div class="mini-cell"><div class="mini-key">Seq#</div><div class="mini-val" id="seq-disp">0</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CHARTS -->
+  <div class="grid2">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">
+          <div class="card-icon ic-amber">&#9636;</div>
+          <span class="card-label">DHT22 History</span>
+        </div>
+        <div style="display:flex;gap:10px">
+          <div style="display:flex;align-items:center;gap:4px;font-size:.6rem;color:var(--muted);font-family:var(--fm)">
+            <div style="width:10px;height:3px;border-radius:99px;background:var(--c3)"></div>Temp°C</div>
+          <div style="display:flex;align-items:center;gap:4px;font-size:.6rem;color:var(--muted);font-family:var(--fm)">
+            <div style="width:10px;height:3px;border-radius:99px;background:var(--c1)"></div>Hum%</div>
+        </div>
+      </div>
+      <div class="chart-container"><canvas id="dht-chart"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">
+          <div class="card-icon ic-red">&#11835;</div>
+          <span class="card-label">MPU6050 History</span>
+        </div>
+        <div style="display:flex;gap:10px">
+          <div style="display:flex;align-items:center;gap:4px;font-size:.6rem;color:var(--muted);font-family:var(--fm)">
+            <div style="width:10px;height:3px;border-radius:99px;background:var(--c1)"></div>|a|g</div>
+          <div style="display:flex;align-items:center;gap:4px;font-size:.6rem;color:var(--muted);font-family:var(--fm)">
+            <div style="width:10px;height:3px;border-radius:99px;background:var(--c2)"></div>|ω|°/s</div>
+        </div>
+      </div>
+      <div class="chart-container"><canvas id="mpu-chart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- ANALYTICS + TX -->
+  <div class="grid31">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">
+          <div class="card-icon ic-blue">&#128261;</div>
+          <span class="card-label">Analytics Window #<span id="anal-seq">0</span></span>
+        </div>
+        <div class="badges-row" id="alert-badges"></div>
+      </div>
+      <div id="anal-content">
+        <div class="analytics-empty">Waiting for first analytics window...</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">
+          <div class="card-icon ic-green">&#8679;</div>
+          <span class="card-label">Transmission</span>
+        </div>
+      </div>
+      <div class="tx-donut">
+        <div style="position:relative;display:flex;align-items:center;justify-content:center">
+          <svg width="82" height="82" viewBox="0 0 82 82">
+            <circle cx="41" cy="41" r="30" fill="none" stroke="var(--track)" stroke-width="7"/>
+            <circle id="tx-ring" cx="41" cy="41" r="30" fill="none" stroke="var(--c2)" stroke-width="7"
+              stroke-dasharray="188.5 188.5" stroke-linecap="round"
+              style="transition:stroke-dasharray .5s;transform:rotate(-90deg);transform-origin:41px 41px"/>
+          </svg>
+          <div style="position:absolute;text-align:center">
+            <div style="font-size:1rem;font-weight:700;font-family:var(--fm)" id="tx-pct">100%</div>
+            <div style="font-size:.5rem;color:var(--muted);font-family:var(--fm)">SUCCESS</div>
+          </div>
+        </div>
+      </div>
+      <div class="tx-rows">
+        <div class="tx-row"><span class="tx-key">Sent</span><span class="tx-val" id="tx-sent" style="color:var(--c2)">0</span></div>
+        <div class="tx-row"><span class="tx-key">Failed</span><span class="tx-val" id="tx-fail" style="color:var(--c5)">0</span></div>
+        <div class="tx-row"><span class="tx-key">Total</span><span class="tx-val" id="tx-tot">0</span></div>
+        <div class="tx-row"><span class="tx-key">Bytes TX</span><span class="tx-val" id="tx-bytes" style="color:var(--c1)">0 B</span></div>
+      </div>
+      <div class="conn-bar" id="conn-bar">
+        <span id="conn-dot" style="font-size:11px;color:var(--c3)">&#9679;</span>
+        <span id="conn-lbl" style="color:var(--c3)">Simulation mode</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- LOG -->
+  <div class="log-box">
+    <div class="log-header">
+      <div class="card-title">
+        <div class="card-icon ic-blue" style="font-size:13px">&#9888;</div>
+        <span class="card-label">System Log</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:.6rem">
+        <span style="font-size:.6rem;font-family:var(--fm);color:var(--muted)" id="log-count">0 entries</span>
+        <button class="clr-btn" id="log-clear">CLEAR</button>
+      </div>
+    </div>
+    <div class="log-body" id="log-body">
+      <div class="log-empty">No entries yet...</div>
+    </div>
+  </div>
+
+  <div class="footer" id="footer-bar">
+    QNX Edge Analytics &middot; PS#34 &middot; DHT22 + MPU6050 &middot; Simulation &middot; 2025
+  </div>
+</div>
+
+<script>
+// ─── STATE ────────────────────────────────────────────────────────────────────
+let running = true, dark = false, connMode = 'sim';
+let piIp = '192.168.1.100', piPort = '8080';
+let seqN = 0, txSent = 0, txFail = 0, txBytes = 0, txSeq = 0;
+let temp = 28, hum = 60, accel = 1.0, gyro = 0.0, dieTemp = 30, vibActive = false;
+let anal = null;
+let logs = [];
+let dhtBuf = [], mpuBuf = [];
+let tick = 0;
+
+// sim state
+let bT=28, bH=60, vA=false, vR=0, cnt=0;
+
+function rnd(lo,hi){ return lo + Math.random()*(hi-lo); }
+function clamp(v,lo,hi){ return Math.max(lo,Math.min(hi,v)); }
+
+// ─── SIMULATION ───────────────────────────────────────────────────────────────
+function simDHT(){
+  bT += rnd(-0.4,0.4); bH += rnd(-1.2,1.2);
+  bT = clamp(bT,18,38); bH = clamp(bH,30,90); cnt++;
+  const spike = cnt%22===0;
+  return {
+    t: Math.round(spike ? bT+rnd(8,12) : bT+rnd(-0.5,0.5)),
+    h: Math.round(spike ? bH+rnd(12,18) : bH+rnd(-2,2)),
+    spike
+  };
+}
+
+function simMPU(){
+  if(!vA && cnt>0 && cnt%(80+Math.floor(rnd(0,40)))===0){vA=true;vR=10+Math.floor(rnd(0,16));}
+  let ax,ay,az,gx,gy,gz;
+  if(vA && vR>0){
+    ax=rnd(1.5,3.5);ay=rnd(1.5,3.5);az=1+rnd(0.5,2);
+    gx=rnd(80,160);gy=rnd(80,160);gz=rnd(30,90);
+    vR--; if(vR===0)vA=false;
+  } else {
+    ax=rnd(-0.05,0.05);ay=rnd(-0.05,0.05);az=1+rnd(-0.02,0.02);
+    gx=rnd(-1,1);gy=rnd(-1,1);gz=rnd(-1,1);
+  }
+  const am=Math.sqrt(ax*ax+ay*ay+az*az), gm=Math.sqrt(gx*gx+gy*gy+gz*gz);
+  return {a:am, g:gm, d:30+rnd(-0.5,0.5), v:vA};
+}
+
+// ─── LOGGING ──────────────────────────────────────────────────────────────────
+function addLog(level, src, msg){
+  const n = new Date();
+  const t = String(n.getHours()).padStart(2,'0')+':'+
+            String(n.getMinutes()).padStart(2,'0')+':'+
+            String(n.getSeconds()).padStart(2,'0');
+  logs.unshift({t,level,src,msg});
+  if(logs.length>100) logs.pop();
+  renderLog();
+}
+
+function srcClass(s){
+  return s==='ANALYTICS'?'ic-blue':s==='TRANSMIT'?'ic-green':s==='DHT22'?'ic-amber':s==='MPU6050'?'ic-red':'';
+}
+function srcColor(s){
+  return s==='ANALYTICS'?'var(--c1)':s==='TRANSMIT'?'var(--c2)':s==='DHT22'?'var(--c3)':s==='MPU6050'?'var(--c5)':'var(--muted)';
+}
+
+function renderLog(){
+  const body = document.getElementById('log-body');
+  document.getElementById('log-count').textContent = logs.length+' entries';
+  if(!logs.length){ body.innerHTML='<div class="log-empty">No entries yet...</div>'; return; }
+  body.innerHTML = logs.map(e=>`
+    <div class="log-row">
+      <span class="log-time">${e.t}</span>
+      <span class="log-src" style="color:${srcColor(e.src)}">${e.src}</span>
+      <span class="log-level ${e.level==='INFO'?'lv-info':e.level==='WARN'?'lv-warn':'lv-alert'}">${e.level}</span>
+      <span class="log-msg">${e.msg}</span>
+    </div>`).join('');
+}
+
+// ─── GAUGE ────────────────────────────────────────────────────────────────────
+function setGauge(id, val, min, max, color){
+  const pct = Math.max(0,Math.min(1,(val-min)/(max-min)));
+  const arc = 169.6, total = 226.2;
+  const filled = arc * pct;
+  const el = document.getElementById(id);
+  el.setAttribute('stroke-dasharray', `${filled} ${total-filled}`);
+  el.setAttribute('stroke', color);
+}
+
+// ─── CHARTS (Canvas 2D — no library needed) ───────────────────────────────────
+const MAX_PTS = 60;
+const dhtData  = { temps:[], hums:[], labels:[] };
+const mpuData  = { accels:[], gyros:[], labels:[] };
+
+function pushPoint(dataset, label, vals){
+  const [arr1key, arr2key] = Object.keys(vals);
+  dataset.labels.push(label);
+  dataset[arr1key].push(vals[arr1key]);
+  dataset[arr2key].push(vals[arr2key]);
+  if(dataset.labels.length > MAX_PTS){
+    dataset.labels.shift();
+    dataset[arr1key].shift();
+    dataset[arr2key].shift();
+  }
+}
+
+function drawChart(canvasId, data1, data2, color1, color2, refLine){
+  const canvas = document.getElementById(canvasId);
+  if(!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.clientWidth, H = canvas.clientHeight || 175;
+  canvas.width = W; canvas.height = H;
+  ctx.clearRect(0,0,W,H);
+
+  const all = [...data1, ...data2];
+  if(!all.length) return;
+  const minV = Math.min(...all)*0.95, maxV = Math.max(...all)*1.05 || 1;
+  const padL=28, padR=8, padT=10, padB=20;
+  const W2=W-padL-padR, H2=H-padT-padB;
+  const xStep = data1.length>1 ? W2/(data1.length-1) : 0;
+  const yScale = v => padT + H2 - ((v-minV)/(maxV-minV))*H2;
+
+  // grid
+  ctx.strokeStyle = dark ? '#38444d' : '#e1eaef';
+  ctx.lineWidth = 0.5;
+  for(let i=0;i<=4;i++){
+    const y = padT + (H2/4)*i;
+    ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(W-padR,y); ctx.stroke();
+    const v = maxV - (maxV-minV)*(i/4);
+    ctx.fillStyle = dark?'#8899a6':'#536471';
+    ctx.font = '9px Courier New';
+    ctx.textAlign='right';
+    ctx.fillText(v.toFixed(0), padL-3, y+3);
+  }
+
+  // reference line
+  if(refLine !== undefined){
+    const ry = yScale(refLine);
+    ctx.strokeStyle='rgba(224,36,94,0.6)';
+    ctx.lineWidth=1; ctx.setLineDash([4,3]);
+    ctx.beginPath(); ctx.moveTo(padL,ry); ctx.lineTo(W-padR,ry); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  function drawLine(data, color){
+    if(data.length<2) return;
+    ctx.strokeStyle=color; ctx.lineWidth=2; ctx.setLineDash([]);
+    ctx.beginPath();
+    data.forEach((v,i)=>{
+      const x=padL+i*xStep, y=yScale(v);
+      i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+    });
+    ctx.stroke();
+    // fill
+    ctx.fillStyle=color.replace(')',',0.1)').replace('var(--c','rgba(').replace('1)','30,157,241,0.1)').replace('2)','0,184,122,0.1)').replace('3)','247,185,40,0.1)');
+    ctx.globalAlpha=0.12;
+    ctx.beginPath();
+    data.forEach((v,i)=>{
+      const x=padL+i*xStep, y=yScale(v);
+      i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+    });
+    ctx.lineTo(padL+(data.length-1)*xStep, padT+H2);
+    ctx.lineTo(padL, padT+H2);
+    ctx.closePath(); ctx.fill();
+    ctx.globalAlpha=1;
+  }
+
+  drawLine(data1, color1);
+  drawLine(data2, color2);
+}
+
+function redrawCharts(){
+  drawChart('dht-chart', dhtData.temps, dhtData.hums, '#f7b928','#1e9df1', 35);
+  drawChart('mpu-chart', mpuData.accels, mpuData.gyros, '#1e9df1','#00b87a', 2);
+}
+
+// ─── UI UPDATE ────────────────────────────────────────────────────────────────
+function updateUI(){
+  const tAlert = temp>35?1:temp<15?-1:0;
+  const vibAlert = vibActive || anal?.vib;
+  const motAlert = anal?.mot;
+
+  // temp card
+  document.getElementById('temp-val').textContent = Math.round(temp);
+  document.getElementById('gauge-temp-val').textContent = Math.round(temp);
+  setGauge('gauge-temp', temp, 15, 45, tAlert?'#e0245e':'#f7b928');
+  const bt = document.getElementById('badge-temp');
+  bt.className = 'status-badge '+(tAlert===1?'sb-err':tAlert===-1?'sb-warn':'sb-ok');
+  bt.textContent = tAlert===1?'HIGH':tAlert===-1?'LOW':'NORMAL';
+  document.getElementById('card-temp').className = 'card'+(tAlert?' alert':'');
+
+  // hum card
+  document.getElementById('hum-val').textContent = Math.round(hum);
+  document.getElementById('gauge-hum-val').textContent = Math.round(hum);
+  setGauge('gauge-hum', hum, 30, 95, hum>80?'#e0245e':'#1e9df1');
+  const bh = document.getElementById('badge-hum');
+  const humAlert = anal?.hum;
+  bh.className = 'status-badge '+(humAlert?'sb-err':'sb-ok');
+  bh.textContent = humAlert?'HIGH':'NORMAL';
+  document.getElementById('card-hum').className = 'card'+(humAlert?' alert':'');
+
+  // accel card
+  document.getElementById('acc-val').textContent = accel.toFixed(3);
+  document.getElementById('acc-pct-lbl').textContent = accel.toFixed(3)+' g';
+  document.getElementById('acc-bar').style.width = Math.min(100,(accel/5)*100)+'%';
+  document.getElementById('acc-bar').style.background = vibAlert?'#e0245e':'#1e9df1';
+  document.getElementById('die-temp').textContent = dieTemp.toFixed(1);
+  const ba = document.getElementById('badge-acc');
+  ba.className = 'status-badge '+(vibAlert?'sb-err':'sb-ok');
+  ba.textContent = vibAlert?'VIBRATION':'STABLE';
+  document.getElementById('card-acc').className = 'card'+(vibAlert?' alert':'');
+
+  // gyro card
+  document.getElementById('gyr-val').textContent = gyro.toFixed(2);
+  document.getElementById('gyr-pct-lbl').textContent = gyro.toFixed(2)+' °/s';
+  document.getElementById('gyr-bar').style.width = Math.min(100,(gyro/200)*100)+'%';
+  document.getElementById('gyr-bar').style.background = motAlert?'#e0245e':'#00b87a';
+  const bg = document.getElementById('badge-gyr');
+  bg.className = 'status-badge '+(motAlert?'sb-err':'sb-ok');
+  bg.textContent = motAlert?'MOTION':'STABLE';
+  document.getElementById('card-gyr').className = 'card'+(motAlert?' alert':'');
+
+  // mini stats
+  if(anal){
+    document.getElementById('temp-min').textContent = anal.tmin+'°';
+    document.getElementById('temp-avg').textContent = anal.tavg.toFixed(1)+'°';
+    document.getElementById('temp-max').textContent = anal.tmax+'°';
+    document.getElementById('hum-min').textContent = anal.hmin+'%';
+    document.getElementById('hum-avg').textContent = anal.havg.toFixed(1)+'%';
+    document.getElementById('hum-max').textContent = anal.hmax+'%';
+    document.getElementById('acc-avg').textContent = anal.aavg.toFixed(3);
+    document.getElementById('acc-peak').textContent = anal.apeak.toFixed(3);
+    document.getElementById('gyr-avg').textContent = anal.gavg.toFixed(2);
+    document.getElementById('gyr-peak').textContent = anal.gpeak.toFixed(2);
+  }
+
+  // seq
+  document.getElementById('seq-num').textContent = seqN;
+  document.getElementById('seq-disp').textContent = seqN;
+
+  // tx
+  const rate = txSeq===0?100:Math.round(txSent/txSeq*100);
+  const C = 2*Math.PI*30;
+  document.getElementById('tx-pct').textContent = rate+'%';
+  document.getElementById('tx-ring').setAttribute('stroke-dasharray',`${C*rate/100} ${C}`);
+  document.getElementById('tx-ring').setAttribute('stroke', rate>90?'#00b87a':'#f7b928');
+  document.getElementById('tx-sent').textContent = txSent;
+  document.getElementById('tx-fail').textContent = txFail;
+  document.getElementById('tx-tot').textContent = txSeq;
+  document.getElementById('tx-bytes').textContent = txBytes>1024?(txBytes/1024).toFixed(1)+' KB':txBytes+' B';
+
+  // mode pill
+  const pill = document.getElementById('mode-pill');
+  const dot = document.getElementById('status-dot');
+  pill.className = 'pill '+connMode;
+  pill.textContent = connMode==='live'?'LIVE · '+piIp:connMode==='sim'?'SIMULATION':'ERROR';
+  dot.style.background = connMode==='live'?'#00b87a':connMode==='sim'?'#f7b928':'#e0245e';
+
+  // conn bar
+  const cl = document.getElementById('conn-lbl');
+  const cd = document.getElementById('conn-dot');
+  if(connMode==='live'){cl.textContent='Pi Connected · '+piIp;cl.style.color='#00b87a';cd.style.color='#00b87a';}
+  else if(connMode==='err'){cl.textContent='Pi unreachable';cl.style.color='#e0245e';cd.style.color='#e0245e';}
+  else{cl.textContent='Simulation mode';cl.style.color='#f7b928';cd.style.color='#f7b928';}
+
+  // buf bars
+  const n = Math.floor(rnd(1,6));
+  document.getElementById('buf-bars').innerHTML =
+    Array.from({length:8}).map((_,i)=>
+      `<div style="width:5px;height:13px;border-radius:2px;background:${i<n?'var(--c1)':'var(--track)'}"></div>`
+    ).join('');
+
+  // footer
+  document.getElementById('footer-bar').textContent =
+    `QNX Edge Analytics · PS#34 · DHT22 + MPU6050 · ${connMode==='live'?'Live @ '+piIp+':'+piPort:'Simulation'} · 2025`;
+
+  // analytics panel
+  updateAnalPanel();
+  redrawCharts();
+}
+
+function updateAnalPanel(){
+  document.getElementById('anal-seq').textContent = seqN;
+  const badges = document.getElementById('alert-badges');
+  const content = document.getElementById('anal-content');
+  if(!anal){
+    badges.innerHTML='';
+    content.innerHTML='<div class="analytics-empty">Waiting for first analytics window...</div>';
+    return;
+  }
+  const bs=[];
+  if(anal.vib) bs.push('<span class="status-badge sb-err">VIBRATION</span>');
+  if(anal.mot) bs.push('<span class="status-badge sb-err">MOTION</span>');
+  if(anal.ta===1) bs.push('<span class="status-badge sb-err">TEMP HIGH</span>');
+  if(anal.ta===-1) bs.push('<span class="status-badge sb-warn">TEMP LOW</span>');
+  if(anal.hum) bs.push('<span class="status-badge sb-err">HUM HIGH</span>');
+  if(!bs.length) bs.push('<span class="status-badge sb-ok">ALL CLEAR</span>');
+  badges.innerHTML = bs.join('');
+
+  const dhtRows = [
+    ['Avg Temp', anal.tavg.toFixed(1)+'°C'],
+    ['Min Temp', anal.tmin+'°C'],
+    ['Max Temp', anal.tmax+'°C'],
+    ['Avg Hum',  anal.havg.toFixed(1)+'%'],
+    ['Min Hum',  anal.hmin+'%'],
+    ['Max Hum',  anal.hmax+'%'],
+  ];
+  const mpuRows = [
+    ['Avg |accel|', anal.aavg.toFixed(4)+' g'],
+    ['Max |accel|', anal.apeak.toFixed(4)+' g'],
+    ['Avg |gyro|',  anal.gavg.toFixed(3)+' °/s'],
+    ['Max |gyro|',  anal.gpeak.toFixed(3)+' °/s'],
+    ['Vibration',   anal.vib?'YES':'NO'],
+    ['Motion',      anal.mot?'YES':'NO'],
+  ];
+  const rowHTML = rows => rows.map(([k,v])=>`
+    <div class="analytics-row">
+      <span class="analytics-key">${k}</span>
+      <span class="analytics-val" style="color:${v==='YES'?'var(--c5)':v==='NO'?'var(--c2)':'inherit'}">${v}</span>
+    </div>`).join('');
+
+  content.innerHTML = `
+    <div class="analytics-grid">
+      <div class="analytics-sub">
+        <div class="analytics-sub-title" style="color:var(--c3)">DHT22 — ${anal.dn} samples</div>
+        ${rowHTML(dhtRows)}
+      </div>
+      <div class="analytics-sub">
+        <div class="analytics-sub-title" style="color:var(--c1)">MPU6050 — ${anal.mn} samples</div>
+        ${rowHTML(mpuRows)}
+      </div>
+    </div>`;
+}
+
+// ─── SIMULATION LOOPS ─────────────────────────────────────────────────────────
+setInterval(()=>{
+  if(!running || connMode!=='sim') return;
+  const m = simMPU();
+  accel=m.a; gyro=m.g; dieTemp=m.d; vibActive=m.v;
+  mpuBuf.push(m); tick++;
+  const label = (tick*0.1).toFixed(1)+'s';
+  pushPoint(mpuData, label, {accels:+m.a.toFixed(4), gyros:+m.g.toFixed(4)});
+  updateUI();
+}, 100);
+
+setInterval(()=>{
+  if(!running || connMode!=='sim') return;
+  const d = simDHT();
+  temp=d.t; hum=d.h;
+  dhtBuf.push(d);
+  const label = new Date().toLocaleTimeString('en',{hour12:false});
+  pushPoint(dhtData, label, {temps:d.t, hums:d.h});
+  if(d.spike) addLog('WARN','DHT22',`Spike detected: temp=${d.t}°C`);
+  updateUI();
+}, 2000);
+
+setInterval(()=>{
+  if(!running || connMode!=='sim') return;
+  const ds = dhtBuf.splice(0), ms = mpuBuf.splice(0);
+  if(!ds.length || !ms.length) return;
+  const aT=ds.reduce((a,b)=>a+b.t,0)/ds.length;
+  const aH=ds.reduce((a,b)=>a+b.h,0)/ds.length;
+  const aA=ms.reduce((a,b)=>a+b.a,0)/ms.length;
+  const xA=Math.max(...ms.map(s=>s.a));
+  const aG=ms.reduce((a,b)=>a+b.g,0)/ms.length;
+  const xG=Math.max(...ms.map(s=>s.g));
+  const vib=ms.filter(s=>s.a>2).length > ms.length*0.2;
+  const mot=ms.filter(s=>s.g>100).length > ms.length*0.1;
+  anal = {
+    tavg:aT, tmin:Math.min(...ds.map(s=>s.t)), tmax:Math.max(...ds.map(s=>s.t)),
+    havg:aH, hmin:Math.min(...ds.map(s=>s.h)), hmax:Math.max(...ds.map(s=>s.h)),
+    aavg:aA, apeak:xA, gavg:aG, gpeak:xG,
+    vib, mot, dn:ds.length, mn:ms.length,
+    ta:aT>35?1:aT<15?-1:0, hum:aH>80
+  };
+  seqN++;
+  const fail = Math.random()<0.05;
+  txSeq++;
+  if(fail){ txFail++; }
+  else { txSent++; txBytes+=256+Math.floor(Math.random()*64); }
+  addLog('INFO','ANALYTICS',`Window: ${ms.length} MPU + ${ds.length} DHT samples`);
+  if(anal.ta===1)  addLog('ALERT','ANALYTICS',`HIGH TEMP: ${aT.toFixed(1)}°C`);
+  if(anal.ta===-1) addLog('ALERT','ANALYTICS',`LOW TEMP: ${aT.toFixed(1)}°C`);
+  if(anal.hum)     addLog('ALERT','ANALYTICS',`HIGH HUM: ${aH.toFixed(1)}%`);
+  if(vib)          addLog('ALERT','ANALYTICS',`VIBRATION: max=${xA.toFixed(3)}g`);
+  if(mot)          addLog('ALERT','ANALYTICS',`MOTION: max=${xG.toFixed(2)}°/s`);
+  if(fail)         addLog('WARN','TRANSMIT','Packet dropped (5% sim loss)');
+  else             addLog('INFO','TRANSMIT','Result delivered OK');
+  updateUI();
+}, 2000);
+
+// ─── LIVE FETCH ───────────────────────────────────────────────────────────────
+let liveTimer = null;
+function startLiveFetch(){
+  if(liveTimer) clearInterval(liveTimer);
+  liveTimer = setInterval(async()=>{
+    if(!running || connMode==='sim') return;
+    try{
+      const res = await fetch(`http://${piIp}:${piPort}/api/telemetry`, {signal:AbortSignal.timeout(2500)});
+      if(!res.ok) throw new Error('HTTP '+res.status);
+      const d = await res.json();
+      temp=d.dht22.temp_raw; hum=d.dht22.hum_raw;
+      accel=d.mpu6050.accel_raw; gyro=d.mpu6050.gyro_raw;
+      dieTemp=d.mpu6050.die_temp; vibActive=d.mpu6050.vibration;
+      txSent=d.tx.sent; txFail=d.tx.failed; txBytes=d.tx.bytes; txSeq=d.tx.seq; seqN=d.seq;
+      if(d.ready){
+        anal={tavg:d.dht22.temp_avg,tmin:d.dht22.temp_min,tmax:d.dht22.temp_max,
+          havg:d.dht22.hum_avg,hmin:d.dht22.hum_min,hmax:d.dht22.hum_max,
+          aavg:d.mpu6050.accel_avg,apeak:d.mpu6050.accel_max,
+          gavg:d.mpu6050.gyro_avg,gpeak:d.mpu6050.gyro_max,
+          vib:d.mpu6050.vibration,mot:d.mpu6050.motion,
+          dn:d.dht22.samples,mn:d.mpu6050.samples,
+          ta:d.dht22.temp_alert,hum:!!d.dht22.hum_alert};
+      }
+      const ts = String(new Date().getSeconds()).padStart(2,'0')+'s';
+      pushPoint(dhtData, ts, {temps:d.dht22.temp_raw, hums:d.dht22.hum_raw});
+      pushPoint(mpuData, ts, {accels:+d.mpu6050.accel_raw.toFixed(4), gyros:+d.mpu6050.gyro_raw.toFixed(4)});
+      if(d.mpu6050.vibration) addLog('ALERT','MPU6050',`VIBRATION max=${d.mpu6050.accel_max.toFixed(3)}g`);
+      connMode='live';
+      document.getElementById('cfg-err').style.display='none';
+    } catch(e){
+      connMode='err';
+      document.getElementById('cfg-err').style.display='';
+      document.getElementById('cfg-err').textContent='Cannot reach Pi: '+e.message;
+      addLog('WARN','NETWORK','Fetch failed: '+e.message);
+    }
+    updateUI();
+  }, 500);
+}
+
+// ─── CONTROLS ─────────────────────────────────────────────────────────────────
+document.getElementById('pause-btn').addEventListener('click',()=>{
+  running=!running;
+  document.getElementById('pause-btn').innerHTML=running?'&#9646;&#9646;':'&#9654;';
+});
+
+document.getElementById('cfg-btn').addEventListener('click',()=>{
+  const p=document.getElementById('cfg-panel');
+  p.style.display = p.style.display==='none'?'flex':'none';
+});
+
+document.getElementById('dark-btn').addEventListener('click',()=>{
+  dark=!dark;
+  document.body.classList.toggle('dark',dark);
+  document.getElementById('dark-btn').innerHTML=dark?'&#9728;':'&#9790;';
+  redrawCharts();
+});
+
+document.getElementById('connect-btn').addEventListener('click',()=>{
+  piIp=document.getElementById('inp-ip').value.trim();
+  piPort=document.getElementById('inp-port').value.trim();
+  connMode='err';
+  addLog('INFO','NETWORK',`Connecting to http://${piIp}:${piPort}/api/telemetry`);
+  startLiveFetch();
+  updateUI();
+});
+
+document.getElementById('sim-btn').addEventListener('click',()=>{
+  connMode='sim';
+  if(liveTimer){clearInterval(liveTimer);liveTimer=null;}
+  document.getElementById('cfg-err').style.display='none';
+  document.getElementById('cfg-hint').textContent='Simulation mode — no Pi needed';
+  addLog('INFO','NETWORK','Switched to simulation mode');
+  updateUI();
+});
+
+document.getElementById('inp-ip').addEventListener('keydown',e=>{ if(e.key==='Enter') document.getElementById('connect-btn').click(); });
+document.getElementById('inp-port').addEventListener('keydown',e=>{ if(e.key==='Enter') document.getElementById('connect-btn').click(); });
+document.getElementById('log-clear').addEventListener('click',()=>{ logs=[]; renderLog(); });
+
+window.addEventListener('resize', redrawCharts);
+
+// init
+updateUI();
+</script>
+</body>
+</html>
+
